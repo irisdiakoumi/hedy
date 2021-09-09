@@ -5,7 +5,7 @@ app_name = os.getenv('HEROKU_APP_NAME', socket.gethostname())
 dyno = os.getenv('DYNO')
 
 config = {
-    'port': 5000,
+    'port': os.getenv ('PORT') or 5000,
     'session': {
         'cookie_name': 'hedy',
         # in minutes
@@ -27,4 +27,13 @@ config = {
         'postfix': ('-' + dyno if dyno else '') + '-' + str(os.getpid()),
         'region': 'eu-west-1'
     },
+    's3-parse-logs': {
+        'bucket': 'hedy-parse-logs',
+        'prefix': app_name + '/',
+        # Make logs from different instances/processes unique
+        'postfix': ('-' + dyno if dyno else '') + '-' + str(os.getpid()),
+        'region': 'eu-west-1'
+    },
+    #enables the quiz environment by setting the config variable on True
+    'quiz-enabled': True,
 }

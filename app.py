@@ -8,34 +8,32 @@ import datetime
 import collections
 import hedy
 import json
-import jsonbin
 import logging
 import os
 from os import path
 import re
-import requests
 import traceback
 import uuid
 from ruamel import yaml
 from flask_commonmark import Commonmark
 from werkzeug.urls import url_encode
 from config import config
-from auth import auth_templates, current_user, requires_login, is_admin, is_teacher
-from utils import db_get, db_get_many, db_set, timems, type_check, object_check, db_del, load_yaml, load_yaml_rt, dump_yaml_rt
+from website.auth import auth_templates, current_user, requires_login, is_admin, is_teacher
+from utils import timems, load_yaml, load_yaml_rt, dump_yaml_rt, version, is_debug_mode
 import utils
-import hashlib
 
 # app.py
-from flask import Flask, request, jsonify, session, abort, g, redirect, make_response, Response
+from flask import Flask, request, jsonify, session, abort, g, redirect, Response, make_response
 from flask_helpers import render_template
 from flask_compress import Compress
 
 # Hedy-specific modules
 import courses
 import hedyweb
-import translating
-import querylog
-import aws_helpers
+from website import querylog, aws_helpers, jsonbin, translating, ab_proxying, cdn, database
+
+# Set the current directory to the root Hedy folder
+os.chdir(os.path.join (os.getcwd (), __file__.replace (os.path.basename (__file__), '')))
 
 # Define and load all available language data
 ALL_LANGUAGES = {
@@ -43,13 +41,16 @@ ALL_LANGUAGES = {
     'nl': 'Nederlands',
     'es': 'Español',
     'fr': 'Français',
-    'pt_br': 'Português',
+    'pt_pt': 'Português (pt)',
+    'pt_br': 'Português (br)',
     'de': 'Deutsch',
     'it': 'Italiano',
     'sw': 'Swahili',
     'hu': 'Magyar',
     'el': 'Ελληνικά',
-    "zh": "简体中文"
+    'zh': "简体中文",
+    'cs': 'Čeština',
+    'bn': 'বাংলা'
 }
 
 LEVEL_DEFAULTS = collections.defaultdict(courses.NoSuchDefaults)
@@ -60,14 +61,11 @@ HEDY_COURSE = collections.defaultdict(courses.NoSuchCourse)
 for lang in ALL_LANGUAGES.keys():
     HEDY_COURSE[lang] = courses.Course('hedy', lang, LEVEL_DEFAULTS[lang])
 
-SPACE_EU_COURSE = {'nl': courses.Course('space_eu', 'nl', LEVEL_DEFAULTS['nl']),
-                   'en': courses.Course('space_eu', 'en', LEVEL_DEFAULTS['en']),
-                   'es': courses.Course('space_eu', 'es', LEVEL_DEFAULTS['es'])
-                   }
-
 ONLINE_MASTERS_COURSE = courses.Course('online_masters', 'nl', LEVEL_DEFAULTS['nl'])
 
 TRANSLATIONS = hedyweb.Translations()
+
+DATABASE = database.Database()
 
 def load_adventures_in_all_languages():
     adventures = {}
@@ -83,12 +81,12 @@ def load_adventure_for_language(lang):
     return adventures [lang]
 
 
-def load_adventure_assignments_per_level(lang, level):
+def load_adventures_per_level(lang, level):
 
     loaded_programs = {}
     # If user is logged in, we iterate their programs that belong to the current level. Out of these, we keep the latest created program for both the level mode (no adventure) and for each of the adventures.
     if current_user (request) ['username']:
-        user_programs = db_get_many ('programs', {'username': current_user (request) ['username']}, True)
+        user_programs = DATABASE.programs_for_user(current_user (request) ['username'])
         for program in user_programs:
             if program ['level'] != level:
                 continue
@@ -98,28 +96,32 @@ def load_adventure_assignments_per_level(lang, level):
             elif loaded_programs [program_key] ['date'] < program ['date']:
                 loaded_programs [program_key] = program
 
-    assignments = []
+    all_adventures = []
     adventures = load_adventure_for_language(lang)['adventures']
     for short_name, adventure in adventures.items ():
         if not level in adventure['levels']:
             continue
-        assignments.append({
+        all_adventures.append({
             'short_name': short_name,
             'name': adventure['name'],
             'image': adventure.get('image', None),
             'default_save_name': adventure['default_save_name'],
             'text': adventure['levels'][level].get('story_text', 'No Story Text'),
             'start_code': adventure['levels'][level].get ('start_code', ''),
-            'loaded_program': '' if not loaded_programs.get (short_name) else loaded_programs.get (short_name) ['code'],
-            'loaded_program_name': '' if not loaded_programs.get (short_name) else loaded_programs.get (short_name) ['name']
+            'loaded_program': '' if not loaded_programs.get (short_name) else {
+                'name': loaded_programs.get (short_name) ['name'],
+                'code': loaded_programs.get (short_name) ['code']
+             }
         })
     # We create a 'level' pseudo assignment to store the loaded program for level mode, if any.
-    assignments.append({
+    all_adventures.append({
         'short_name': 'level',
-        'loaded_program': '' if not loaded_programs.get ('level') else loaded_programs.get ('level') ['code'],
-        'loaded_program_name': '' if not loaded_programs.get ('level') else loaded_programs.get ('level') ['name']
+        'loaded_program': '' if not loaded_programs.get ('level') else {
+            'name': loaded_programs.get ('level') ['name'],
+            'code': loaded_programs.get ('level') ['code']
+         }
     })
-    return assignments
+    return all_adventures
 
 # Load main menu (do it once, can be cached)
 with open(f'main/menu.json', 'r', encoding='utf-8') as f:
@@ -133,48 +135,14 @@ logging.basicConfig(
 app = Flask(__name__, static_url_path='')
 # Ignore trailing slashes in URLs
 app.url_map.strict_slashes = False
-utils.set_debug_mode_based_on_flask(app)
 
+cdn.Cdn(app, os.getenv('CDN_PREFIX'), os.getenv('HEROKU_SLUG_COMMIT', 'dev'))
 
-CDN_PREFIX = os.getenv('CDN_PREFIX', None)
-STATIC_PREFIX = '/'
-if CDN_PREFIX:
-    # If we are using a CDN, also host static resources under a URL that includes
-    # the version number (so the CDN can aggressively cache the static assets and we
-    # still can invalidate them whenever necessary).
-    #
-    # The function {{static('/js/bla.js')}} can be used to retrieve the URL of static
-    # assets, either from the CDN if configured or just the normal URL we would use
-    # without a CDN.
-    #
-    # We still keep on hosting static assets in the "old" location as well for images in
-    # emails and content we forgot to replace or are unable to replace (like in MarkDowns).
-    STATIC_PREFIX = '/static-' + os.getenv('HEROKU_SLUG_COMMIT', 'dev')
-    app.add_url_rule(STATIC_PREFIX + '/<path:filename>',
-            endpoint="static",
-            view_func=app.send_static_file)
-
-
-@app.context_processor
-def inject_static():
-    """Add the 'static' function to the Template context, to return links to static resources."""
-    def static(url):
-        return utils.slash_join(CDN_PREFIX, STATIC_PREFIX, url)
-    return dict(static=static)
-
-
-def hash_user_or_session (string):
-    hash = hashlib.md5 (string.encode ('utf-8')).hexdigest ()
-    return int (hash, 16)
-
-def redirect_ab (request, session):
-    # If the user is logged in, we use their username as identifier, otherwise we use the session id
-    user_identifier = current_user(request) ['username'] or str (session_id ())
-
-    # This will send 50% of the requests into redirect.
-    redirect_proportion = 50
-    redirect_flag = (hash_user_or_session (user_identifier) % 100) < redirect_proportion
-    return redirect_flag
+# Set session id if not already set. This must be done as one of the first things,
+# so the function should be defined high up.
+@app.before_request
+def set_session_cookie():
+    session_id()
 
 if os.getenv('IS_PRODUCTION'):
     @app.before_request
@@ -182,44 +150,11 @@ if os.getenv('IS_PRODUCTION'):
         if utils.is_testing_request (request):
             return 'No E2E tests are allowed in production', 400
 
-# If present, PROXY_TO_TEST_ENV should be the name of the target environment
-if os.getenv ('PROXY_TO_TEST_ENV') and not os.getenv ('IS_TEST_ENV'):
-    @app.before_request
-    def before_request_proxy():
-        # If it is an auth route, we do not reverse proxy it to the PROXY_TO_TEST_ENV environment, with the exception of /auth/texts
-        # We want to keep all cookie setting in the main environment, not the test one.
-        if (re.match ('.*/auth/.*', request.url) and not re.match ('.*/auth/texts', request.url)):
-            pass
-        # If we enter this block, we will reverse proxy the request to the PROXY_TO_TEST_ENV environment.
-        elif (redirect_ab (request, session)):
-
-            print ('DEBUG TEST - REVERSE PROXYING REQUEST', request.method, request.url, session_id ())
-
-            url = request.url.replace (os.getenv ('HEROKU_APP_NAME'), os.getenv ('PROXY_TO_TEST_ENV'))
-
-            request_headers = {}
-            for header in request.headers:
-                if (header [0].lower () in ['host']):
-                    continue
-                request_headers [header [0]] = header [1]
-
-            # Send the session_id to the test environment for logging purposes
-            request_headers ['x-session_id'] = session_id ()
-            r = getattr (requests, request.method.lower ()) (url, headers=request_headers, data=request.data)
-
-            response = make_response (r.content)
-            for header in r.headers:
-                # With great help from https://medium.com/customorchestrator/simple-reverse-proxy-server-using-flask-936087ce0afb
-                # We ignore the set-cookie header
-                if (header.lower () in ['content-encoding', 'content-length', 'transfer-encoding', 'connection', 'set-cookie']):
-                    continue
-                response.headers [header] = r.headers [header]
-            return response, r.status_code
-
-if os.getenv ('IS_TEST_ENV'):
-    @app.before_request
-    def before_request_receive_proxy():
-        print ('DEBUG TEST - RECEIVE PROXIED REQUEST', request.method, request.url, session_id ())
+@app.before_request
+def before_request_proxy_testing():
+    if utils.is_testing_request (request):
+        if os.getenv ('IS_TEST_ENV'):
+            session ['test_session'] = 'test'
 
 # HTTP -> HTTPS redirect
 # https://stackoverflow.com/questions/32237379/python-flask-redirect-to-https-from-http/32238093
@@ -233,20 +168,30 @@ if os.getenv ('REDIRECT_HTTP_TO_HTTPS'):
 
 # Unique random key for sessions.
 # For settings with multiple workers, an environment variable is required, otherwise cookies will be constantly removed and re-set by different workers.
-app.config['SECRET_KEY'] = os.getenv ('SECRET_KEY') or uuid.uuid4().hex
+if utils.is_production():
+    if not os.getenv ('SECRET_KEY'):
+        raise RuntimeError('The SECRET KEY must be provided for non-dev environments.')
 
-# Set security attributes for cookies in a central place - but not when running locally, so that session cookies work well without HTTPS
-if os.getenv ('HEROKU_APP_NAME'):
+    app.config['SECRET_KEY'] = os.getenv ('SECRET_KEY')
+
+else:
+    app.config['SECRET_KEY'] = os.getenv ('SECRET_KEY', uuid.uuid4().hex)
+
+if utils.is_heroku():
     app.config.update(
         SESSION_COOKIE_SECURE=True,
         SESSION_COOKIE_HTTPONLY=True,
         SESSION_COOKIE_SAMESITE='Lax',
     )
 
+# Set security attributes for cookies in a central place - but not when running locally, so that session cookies work well without HTTPS
+
 Compress(app)
 Commonmark(app)
-logger = jsonbin.JsonBinLogger.from_env_vars()
-querylog.LOG_QUEUE.set_transmitter(aws_helpers.s3_transmitter_from_env())
+parse_logger = jsonbin.MultiParseLogger(
+    jsonbin.JsonBinLogger.from_env_vars(),
+    jsonbin.S3ParseLogger.from_env_vars())
+querylog.LOG_QUEUE.set_transmitter(aws_helpers.s3_querylog_transmitter_from_env())
 
 # Check that requested language is supported, otherwise return 404
 @app.before_request
@@ -254,7 +199,7 @@ def check_language():
     if requested_lang() not in ALL_LANGUAGES.keys ():
         return "Language " + requested_lang () + " not supported", 404
 
-if not os.getenv('HEROKU_RELEASE_CREATED_AT'):
+if utils.is_heroku() and not os.getenv('HEROKU_RELEASE_CREATED_AT'):
     logging.warning('Cannot determine release; enable Dyno metadata by running "heroku labs:enable runtime-dyno-metadata -a <APP_NAME>"')
 
 
@@ -267,10 +212,35 @@ def after_request_log_status(response):
     querylog.log_value(http_code=response.status_code)
     return response
 
+@app.after_request
+def set_security_headers(response):
+    security_headers = {
+        'Strict-Transport-Security': 'max-age=31536000; includeSubDomains',
+        'X-Frame-Options': 'DENY',
+        'X-XSS-Protection': '1; mode=block',
+    }
+    response.headers.update(security_headers)
+    return response
+
 @app.teardown_request
 def teardown_request_finish_logging(exc):
     querylog.finish_global_log_record(exc)
 
+# If present, PROXY_TO_TEST_HOST should be the 'http[s]://hostname[:port]' of the target environment
+if os.getenv ('PROXY_TO_TEST_HOST') and not os.getenv ('IS_TEST_ENV'):
+    ab_proxying.ABProxying(app, os.getenv ('PROXY_TO_TEST_HOST'), app.config['SECRET_KEY'])
+
+@app.route('/session_test', methods=['GET'])
+def echo_session_vars_test():
+    if not utils.is_testing_request (request):
+        return 'This endpoint is only meant for E2E tests', 400
+    return jsonify({'session': dict(session)})
+
+@app.route('/session_main', methods=['GET'])
+def echo_session_vars_main():
+    if not utils.is_testing_request (request):
+        return 'This endpoint is only meant for E2E tests', 400
+    return jsonify({'session': dict(session), 'proxy_enabled': bool (os.getenv ('PROXY_TO_TEST_HOST'))})
 
 @app.route('/parse', methods=['POST'])
 def parse():
@@ -281,11 +251,15 @@ def parse():
         return "body.code must be a string", 400
     if 'level' not in body:
         return "body.level must be a string", 400
-    if 'adventure_name' in body and not type_check (body ['adventure_name'], 'str'):
+    if 'sublevel' in body and not isinstance(body ['sublevel'], int):
+        return "If present, body.sublevel must be an integer", 400
+    if 'adventure_name' in body and not isinstance(body ['adventure_name'], str):
         return "if present, body.adventure_name must be a string", 400
 
     code = body ['code']
     level = int(body ['level'])
+    sublevel = body.get ('sublevel') or 0
+
     # Language should come principally from the request body,
     # but we'll fall back to browser default if it's missing for whatever
     # reason.
@@ -304,8 +278,15 @@ def parse():
         try:
             hedy_errors = TRANSLATIONS.get_translations(lang, 'HedyErrorMessages')
             with querylog.log_time('transpile'):
-                result = hedy.transpile(code, level)
-            response["Code"] = "# coding=utf8\nimport random\n" + result
+                transpile_result = hedy.transpile(code, level, sublevel)
+                code = transpile_result.code
+                has_turtle = transpile_result.has_turtle
+
+            response['has_turtle'] = has_turtle
+            if has_turtle:
+                response["Code"] = "# coding=utf8\nimport random\nimport turtle\nt = turtle.Turtle()\nt.forward(0)\n" + code
+            else:
+                response["Code"] = "# coding=utf8\nimport random\n" + code
         except hedy.HedyException as E:
             traceback.print_exc()
             # some 'errors' can be fixed, for these we throw an exception, but also
@@ -316,11 +297,19 @@ def parse():
                 response["Warning"] = error_template.format(**E.arguments)
             elif E.args[0] == "Parse":
                 error_template = hedy_errors[E.error_code]
-                # Localize the names of characters
-                if 'character_found' in E.arguments:
-                    E.arguments['character_found'] = hedy_errors[E.arguments['character_found']]
+                # Localize the names of characters. If we can't do that, just show the original
+                # character.
+                if 'character_found' in E.arguments.keys():
+                    E.arguments['character_found'] = hedy_errors.get(E.arguments['character_found'], E.arguments['character_found'])
+                elif 'keyword_found' in E.arguments.keys():
+                    #if we find an invalid keyword, place it in the same location in the error message but without translating
+                    E.arguments['character_found'] = E.arguments['keyword_found']
+
                 response["Error"] = error_template.format(**E.arguments)
             elif E.args[0] == "Unquoted Text":
+                error_template = hedy_errors[E.error_code]
+                response["Error"] = error_template.format(**E.arguments)
+            elif E.args[0] == "Has Blanks":
                 error_template = hedy_errors[E.error_code]
                 response["Error"] = error_template.format(**E.arguments)
             else:
@@ -331,7 +320,7 @@ def parse():
             print(f"error transpiling {code}")
             response["Error"] = str(E)
     querylog.log_value(server_error=response.get('Error'))
-    logger.log ({
+    parse_logger.log ({
         'session': session_id(),
         'date': str(datetime.datetime.now()),
         'level': level,
@@ -350,7 +339,7 @@ def parse():
 def report_error():
     post_body = request.json
 
-    logger.log ({
+    parse_logger.log ({
         'session': session_id(),
         'date': str(datetime.datetime.now()),
         'level': post_body.get('level'),
@@ -362,6 +351,22 @@ def report_error():
     })
 
     return 'logged'
+
+@app.route('/client_exception', methods=['POST'])
+def report_client_exception():
+    post_body = request.json
+
+    querylog.log_value(
+        session=session_id(),
+        date=str(datetime.datetime.now()),
+        client_error=post_body,
+        version=version(),
+        username=current_user(request) ['username'] or None,
+        is_test=1 if os.getenv ('IS_TEST_ENV') else None
+    )
+
+    # Return a 500 so the HTTP status codes will stand out in our monitoring/logging
+    return 'logged', 500
 
 @app.route('/version', methods=['GET'])
 def version_page():
@@ -387,38 +392,149 @@ def version_page():
 def programs_page (request):
     username = current_user(request) ['username']
     if not username:
-        return "unauthorized", 403
+        # redirect users to /login if they are not logged in
+        url = request.url.replace('/programs', '/login')
+        return redirect(url, code=302)
 
     from_user = request.args.get('user') or None
     if from_user and not is_admin (request):
-        return "unauthorized", 403
+        if not is_teacher (request):
+            return "unauthorized", 403
+        students = DATABASE.get_teacher_students (username)
+        if from_user not in students:
+            return "unauthorized", 403
 
-    texts=TRANSLATIONS.data [requested_lang ()] ['Programs']
-    ui=TRANSLATIONS.data [requested_lang ()] ['ui']
+    texts=TRANSLATIONS.get_translations (requested_lang (), 'Programs')
+    ui=TRANSLATIONS.get_translations (requested_lang (), 'ui')
     adventures = load_adventure_for_language(requested_lang ())['adventures']
 
-    result = db_get_many ('programs', {'username': from_user or username}, True)
+    result = DATABASE.programs_for_user(from_user or username)
     programs = []
     now = timems ()
     for item in result:
-        measure = texts ['minutes']
-        date = round ((now - item ['date']) / 60000)
-        if date > 90:
+        program_age = now - item ['date']
+        if program_age < 1000 * 60 * 60:
+            measure = texts ['minutes']
+            date = round (program_age / (1000 * 60))
+        elif program_age < 1000 * 60 * 60 * 24:
             measure = texts ['hours']
-            date = round (date / 60)
-        if date > 36:
+            date = round (program_age / (1000 * 60 * 60))
+        else:
             measure = texts ['days']
+            date = round (program_age / (1000 * 60 * 60 * 24))
 
-            date = round (date / 24)
+        programs.append ({'id': item ['id'], 'code': item ['code'], 'date': texts ['ago-1'] + ' ' + str (date) + ' ' + measure + ' ' + texts ['ago-2'], 'level': item ['level'], 'name': item ['name'], 'adventure_name': item.get ('adventure_name'), 'public': item.get ('public')})
 
-        programs.append ({'id': item ['id'], 'code': item ['code'], 'date': texts ['ago-1'] + ' ' + str (date) + ' ' + measure + ' ' + texts ['ago-2'], 'level': item ['level'], 'name': item ['name'], 'adventure_name': item.get ('adventure_name')})
+    return render_template('programs.html', lang=requested_lang(), menu=render_main_menu('programs'), texts=texts, ui=ui, auth=TRANSLATIONS.get_translations (requested_lang (), 'Auth'), programs=programs, username=username, is_teacher=is_teacher (request), current_page='programs', from_user=from_user, adventures=adventures)
 
-    return render_template('programs.html', lang=requested_lang(), menu=render_main_menu('programs'), texts=texts, ui=ui, auth=TRANSLATIONS.data [requested_lang ()] ['Auth'], programs=programs, username=username, current_page='programs', from_user=from_user, adventures=adventures)
+@app.route('/quiz/start/<level>', methods=['GET'])
+def get_quiz_start(level):
+    if not config['quiz-enabled'] and g.lang != 'nl':
+        return 'Hedy quiz disabled!', 404
+    else:
+        g.lang = lang = requested_lang()
+        g.prefix = '/hedy'
+
+         #Sets the values of total_score and correct on the beginning of the quiz at 0
+        session['total_score'] = 0
+        session['correct_answer'] = 0
+        return render_template('startquiz.html', level=level, next_assignment=1, menu=render_main_menu('adventures'),
+                               lang=lang,
+                               username=current_user(request)['username'], is_teacher=is_teacher (request),
+                               auth=TRANSLATIONS.get_translations (requested_lang(), 'Auth'))
+
+
+# Quiz mode
+# Fill in the filename as source
+@app.route('/quiz/quiz_questions/<level_source>/<question_nr>', methods=['GET'])
+def get_quiz(level_source, question_nr):
+    if not config['quiz-enabled'] and g.lang != 'nl':
+        return 'Hedy quiz disabled!', 404
+    else:
+        # Reading the yaml file
+        if os.path.isfile(f'coursedata/quiz/quiz_questions_lvl{level_source}.yaml'):
+            quiz_data = load_yaml(f'coursedata/quiz/quiz_questions_lvl{level_source}.yaml')
+        else:
+            return 'No quiz yaml file found for this level', 404
+
+        # set globals
+        g.lang = lang = requested_lang()
+        g.prefix = '/hedy'
+
+        # Loop through the questions and check that the loop doesn't reach out of bounds
+        q_nr = int(question_nr)
+        if q_nr <= len(quiz_data['questions']):
+            question = quiz_data['questions'][q_nr - 1].get(q_nr)
+
+            # Convert the indices to the corresponding characters
+            char_array = []
+            for i in range(len(question['mp_choice_options'])):
+                char_array.append(chr(ord('@') + (i + 1)))
+            return render_template('quiz_question.html', quiz=quiz_data, level_source=level_source,
+                                   questions=quiz_data['questions'],
+                                   question=quiz_data['questions'][q_nr - 1].get(q_nr), question_nr=q_nr,
+                                   correct=session.get('correct_answer'),
+                                   char_array=char_array,
+                                   menu=render_main_menu('adventures'), lang=lang,
+                                   username=current_user(request)['username'],
+                                   is_teacher=is_teacher(request),
+                                   auth=TRANSLATIONS.get_translations (requested_lang(), 'Auth'))
+        else:
+            return render_template('endquiz.html', correct=session.get('correct_answer'),
+                                   total_score=session.get('total_score'),
+                                   menu=render_main_menu('adventures'), lang=lang,
+                                   quiz=quiz_data, level=int(level_source) + 1, questions=quiz_data['questions'],
+                                   next_assignment=1, username=current_user(request)['username'],
+                                   is_teacher=is_teacher(request),
+                                   auth=TRANSLATIONS.get_translations (requested_lang(), 'Auth'))
+
+
+@app.route('/submit_answer/<level_source>/<question_nr>', methods=["POST"])
+def submit_answer(level_source, question_nr):
+    if not config['quiz-enabled'] and g.lang != 'nl':
+        return 'Hedy quiz disabled!', 404
+    else:
+        # Get the chosen option from the request form with radio buttons
+        option = request.form["radio_option"]
+
+        # Reading yaml file
+        if os.path.isfile(f'coursedata/quiz/quiz_questions_lvl{level_source}.yaml'):
+            quiz_data = load_yaml(f'coursedata/quiz/quiz_questions_lvl{level_source}.yaml')
+        else:
+            return 'No quiz yaml file found for this level', 404
+
+        # Convert question_nr to an integer
+        q_nr = int(question_nr)
+
+        # Convert the corresponding chosen option to the index of an option
+        question = quiz_data['questions'][q_nr - 1].get(q_nr)
+        index_option = ord(option.split("-")[1]) - 65
+
+        # If the correct answer is chosen, update the total score and the number of correct answered questions
+        if question['correct_answer'] in option:
+            session['total_score'] = session.get('total_score') + question['question_score']
+            session['correct_answer'] = session.get('correct_answer') + 1
+
+        # Loop through the questions
+        if q_nr <= len(quiz_data['questions']):
+            return render_template('feedback.html', quiz=quiz_data, question=question,
+                                   questions=quiz_data['questions'],
+                                   level_source=level_source,
+                                   question_nr=q_nr,
+                                   correct=session.get('correct_answer'),
+                                   option=option,
+                                   index_option=index_option,
+                                   menu=render_main_menu('adventures'), lang=lang,
+                                   username=current_user(request)['username'],
+                                   is_teacher=is_teacher(request),
+                                   auth=TRANSLATIONS.get_translations (requested_lang(), 'Auth'))
+        else:  # show a different page for after the last question
+            return 'No end quiz page!', 404
 
 # Adventure mode
 @app.route('/hedy/adventures', methods=['GET'])
 def adventures_list():
-    return render_template('adventures.html', lang=lang, adventures=load_adventure_for_language (requested_lang ()), menu=render_main_menu('adventures'), username=current_user(request) ['username'], auth=TRANSLATIONS.data [lang] ['Auth'])
+    return render_template('adventures.html', lang=lang, adventures=load_adventure_for_language (requested_lang ()), menu=render_main_menu('adventures'), username=current_user(request) ['username'], is_teacher=is_teacher(request), auth=TRANSLATIONS.get_translations (requested_lang (), 'Auth'))
 
 @app.route('/hedy/adventures/<adventure_name>', methods=['GET'], defaults={'level': 1})
 @app.route('/hedy/adventures/<adventure_name>/<level>', methods=['GET'])
@@ -440,7 +556,7 @@ def adventure_page(adventure_name, level):
         # If there are many, note the highest level for which there is a saved program
         desired_level = 0
         if user ['username']:
-            existing_programs = db_get_many ('programs', {'username': user ['username']}, True)
+            existing_programs = DATABASE.programs_for_user(user ['username'])
             for program in existing_programs:
                 if 'adventure_name' in program and program ['adventure_name'] == adventure_name and program ['level'] > desired_level:
                     desired_level = program ['level']
@@ -450,7 +566,7 @@ def adventure_page(adventure_name, level):
         # If user is not logged in, or has no saved programs for this adventure, default to the lowest level available for the adventure
         if desired_level == 0:
             for key in adventure ['levels'].keys ():
-                if type_check (key, 'int') and (desired_level == 0 or desired_level > key):
+                if isinstance(key, int) and (desired_level == 0 or desired_level > key):
                     desired_level = key
         level = desired_level
 
@@ -458,131 +574,173 @@ def adventure_page(adventure_name, level):
     if not level in adventure ['levels']:
         abort(404)
 
-    adventure_assignments = load_adventure_assignments_per_level(requested_lang(), level)
+    adventures = load_adventures_per_level(requested_lang(), level)
     g.prefix = '/hedy'
-    return hedyweb.render_assignment_editor(
+    return hedyweb.render_code_editor_with_tabs(
         request=request,
         course=HEDY_COURSE[requested_lang()],
         level_number=level,
-        assignment_number=1,
         menu=render_main_menu('hedy'),
         translations=TRANSLATIONS,
         version=version(),
-        adventure_assignments=adventure_assignments,
+        adventures=adventures,
         # The relevant loaded program will be available to client-side js and it will be loaded by js.
         loaded_program='',
-        loaded_program_name='',
         adventure_name=adventure_name)
 
 # routing to index.html
-@app.route('/hedy', methods=['GET'], defaults={'level': 1, 'step': 1})
+@app.route('/ontrack', methods=['GET'], defaults={'level': '1', 'step': 1})
+@app.route('/hedy', methods=['GET'], defaults={'level': '1', 'step': 1})
 @app.route('/hedy/<level>', methods=['GET'], defaults={'step': 1})
 @app.route('/hedy/<level>/<step>', methods=['GET'])
 def index(level, step):
-    session_id()  # Run this for the side effect of generating a session ID
-    try:
-        g.level = level = int(level)
-    except:
+    # Sublevel requested
+    if re.match ('\d+-\d+', level):
+        pass
+        # If level has a dash, we keep it as a string
+    # Normal level requested
+    elif re.match ('\d', level):
+        try:
+            g.level = level = int(level)
+        except:
+            return 'No such Hedy level!', 404
+    else:
         return 'No such Hedy level!', 404
+
     g.lang = requested_lang()
     g.prefix = '/hedy'
 
     loaded_program = ''
-    loaded_program_name = ''
     adventure_name = ''
 
     # If step is a string that has more than two characters, it must be an id of a program
-    if step and type_check (step, 'str') and len (step) > 2:
-        result = db_get ('programs', {'id': step})
+    if step and isinstance(step, str) and len (step) > 2:
+        result = DATABASE.program_by_id(step)
         if not result:
             return 'No such program', 404
-        # Allow only the owner of the program, the admin user and the teacher users to access the program
+        # If the program is not public, allow only the owner of the program, the admin user and the teacher users to access the program
         user = current_user (request)
-        if user ['username'] != result ['username'] and not is_admin (request) and not is_teacher (request):
+        public_program = 'public' in result and result ['public']
+        if not public_program and user ['username'] != result ['username'] and not is_admin (request) and not is_teacher (request):
             return 'No such program!', 404
-        loaded_program = result ['code']
-        loaded_program_name = result ['name']
+        loaded_program = {'code': result ['code'], 'name': result ['name'], 'adventure_name': result.get ('adventure_name')}
         if 'adventure_name' in result:
             adventure_name = result ['adventure_name']
-        # We default to step 1 to provide a meaningful default assignment
-        step = 1
 
-    adventure_assignments = load_adventure_assignments_per_level(g.lang, level)
+    adventures = load_adventures_per_level(g.lang, level)
 
-    return hedyweb.render_assignment_editor(
+    return hedyweb.render_code_editor_with_tabs(
         request=request,
         course=HEDY_COURSE[g.lang],
         level_number=level,
-        assignment_number=step,
         menu=render_main_menu('hedy'),
         translations=TRANSLATIONS,
         version=version(),
-        adventure_assignments=adventure_assignments,
+        adventures=adventures,
         loaded_program=loaded_program,
-        loaded_program_name=loaded_program_name,
         adventure_name=adventure_name)
 
+@app.route('/hedy/<id>/view', methods=['GET'])
+def view_program(id):
+    g.lang = requested_lang()
+    g.prefix = '/hedy'
+
+    result = DATABASE.program_by_id(id)
+    if not result:
+        return 'No such program', 404
+
+    # Default to the language of the program's author (but still respect)
+    # the switch if given.
+    lang = request.args.get("lang")
+    if not lang:
+        lang = result['lang']
+
+    arguments_dict = {}
+    arguments_dict['program_id'] = id
+    arguments_dict['page_title'] = f'{result["name"]} – Hedy'
+    arguments_dict['level'] = result['level']  # Necessary for running
+    arguments_dict['loaded_program'] = result
+    arguments_dict['editor_readonly'] = True
+    arguments_dict['show_edit_button'] = True
+
+    # Everything below this line has nothing to do with this page and it's silly
+    # that every page needs to put in so much effort to re-set it
+    arguments_dict['lang'] = lang
+    arguments_dict['menu'] = render_main_menu('view')
+    arguments_dict['auth'] = TRANSLATIONS.get_translations(lang, 'Auth')
+    arguments_dict['username'] = current_user(request) ['username'] or None
+    arguments_dict['is_teacher'] = is_teacher(request)
+    arguments_dict.update(**TRANSLATIONS.get_translations(lang, 'ui'))
+
+    return render_template("view-program-page.html", **arguments_dict)
+
+
 @app.route('/onlinemasters', methods=['GET'], defaults={'level': 1, 'step': 1})
-@app.route('/onlinemasters/<level>', methods=['GET'], defaults={'step': 1})
-@app.route('/onlinemasters/<level>/<step>', methods=['GET'])
+@app.route('/onlinemasters/<int:level>', methods=['GET'], defaults={'step': 1})
+@app.route('/onlinemasters/<int:level>/<int:step>', methods=['GET'])
 def onlinemasters(level, step):
-    session_id()  # Run this for the side effect of generating a session ID
     g.level = level = int(level)
     g.lang = lang = requested_lang()
     g.prefix = '/onlinemasters'
 
-    adventure_assignments = load_adventure_assignments_per_level(g.lang, level)
+    adventures = load_adventures_per_level(g.lang, level)
 
-    return hedyweb.render_assignment_editor(
+    return hedyweb.render_code_editor_with_tabs(
         request=request,
         course=ONLINE_MASTERS_COURSE,
         level_number=level,
-        assignment_number=step,
         translations=TRANSLATIONS,
         version=version(),
         menu=None,
-        adventure_assignments=adventure_assignments,
+        adventures=adventures,
         loaded_program='',
-        loaded_program_name='',
         adventure_name='')
 
 @app.route('/space_eu', methods=['GET'], defaults={'level': 1, 'step': 1})
-@app.route('/space_eu/<level>', methods=['GET'], defaults={'step': 1})
-@app.route('/space_eu/<level>/<step>', methods=['GET'])
+@app.route('/space_eu/<int:level>', methods=['GET'], defaults={'step': 1})
+@app.route('/space_eu/<int:level>/<int:step>', methods=['GET'])
 def space_eu(level, step):
-    session_id()  # Run this for the side effect of generating a session ID
     g.level = level = int(level)
     g.lang = requested_lang()
     g.prefix = '/space_eu'
 
-    adventure_assignments = load_adventure_assignments_per_level(g.lang, level)
+    adventures = load_adventures_per_level(g.lang, level)
 
-    return hedyweb.render_assignment_editor(
+    return hedyweb.render_code_editor_with_tabs(
         request=request,
-        course=SPACE_EU_COURSE[g.lang],
+        course=HEDY_COURSE[g.lang],
         level_number=level,
-        assignment_number=step,
         translations=TRANSLATIONS,
         version=version(),
         menu=None,
-        adventure_assignments=adventure_assignments,
+        adventures=adventures,
         loaded_program='',
-        loaded_program_name='',
         adventure_name='')
 
 
 
-@app.route('/error_messages.js', methods=['GET'])
-def error():
+@app.route('/client_messages.js', methods=['GET'])
+def client_messages():
     error_messages = TRANSLATIONS.get_translations(requested_lang(), "ClientErrorMessages")
-    return render_template("error_messages.js", error_messages=json.dumps(error_messages))
+    ui_messages = TRANSLATIONS.get_translations(requested_lang(), "ui")
+    auth_messages = TRANSLATIONS.get_translations(requested_lang(), "Auth")
 
+    response = make_response(render_template("client_messages.js",
+        error_messages=json.dumps(error_messages),
+        ui_messages=json.dumps(ui_messages),
+        auth_messages=json.dumps(auth_messages)))
+
+    if not is_debug_mode():
+        # Cache for longer when not devving
+        response.cache_control.max_age = 60 * 60  # Seconds
+
+    return response
 
 @app.errorhandler(500)
 def internal_error(exception):
     import traceback
     print(traceback.format_exc())
-    return "<h1>500 Internal Server Error</h1>"
+    return "<h1>500 Internal Server Error</h1>", 500
 
 @app.route('/index.html')
 @app.route('/')
@@ -616,17 +774,21 @@ def main_page(page):
     front_matter, markdown = split_markdown_front_matter(contents)
 
     menu = render_main_menu(page)
-    return render_template('main-page.html', mkd=markdown, lang=lang, menu=menu, username=current_user(request) ['username'], auth=TRANSLATIONS.data [lang] ['Auth'], **front_matter)
+    if page == 'for-teachers':
+        teacher_classes = [] if not current_user (request) ['username'] else DATABASE.get_teacher_classes (current_user (request) ['username'], True)
+        return render_template('for-teachers.html', sections=split_teacher_docs (contents), lang=lang, menu=menu, username=current_user(request) ['username'], is_teacher=is_teacher(request), auth=TRANSLATIONS.get_translations (lang, 'Auth'), teacher_classes=teacher_classes, **front_matter)
+
+    return render_template('main-page.html', mkd=markdown, lang=lang, menu=menu, username=current_user(request) ['username'], is_teacher=is_teacher(request), auth=TRANSLATIONS.get_translations (lang, 'Auth'), **front_matter)
 
 
 def session_id():
     """Returns or sets the current session ID."""
-    if os.getenv('IS_TEST_ENV') and 'x-session_id' in request.headers:
-        return request.headers['x-session_id']
     if 'session_id' not in session:
-        session['session_id'] = uuid.uuid4().hex
+        if os.getenv ('IS_TEST_ENV') and 'X-session_id' in request.headers:
+            session['session_id'] = request.headers ['X-session_id']
+        else:
+            session['session_id'] = uuid.uuid4().hex
     return session['session_id']
-
 
 def requested_lang():
     """Return the user's requested language code.
@@ -666,7 +828,10 @@ def localize_link(url):
     lang = requested_lang()
     if not lang:
         return url
-    return url + '?lang=' + lang
+    if '?' in url:
+        return url + '&lang=' + lang
+    else:
+        return url + '?lang=' + lang
 
 def make_lang_obj(lang):
     """Make a language object for a given language."""
@@ -691,19 +856,6 @@ def no_none_sense(d):
     return {k: v for k, v in d.items() if v is not None}
 
 
-def version():
-    """Get the version from the Heroku environment variables."""
-    if not os.getenv('DYNO'):
-        # Not on Heroku
-        return 'DEV'
-
-    vrz = os.getenv('HEROKU_RELEASE_CREATED_AT')
-    the_date = datetime.date.fromisoformat(vrz[:10]) if vrz else datetime.date.today()
-
-    commit = os.getenv('HEROKU_SLUG_COMMIT', '????')[0:6]
-    return the_date.strftime('%b %d') + f' ({commit})'
-
-
 def split_markdown_front_matter(md):
     parts = re.split('^---', md, 1, re.M)
     if len(parts) == 1:
@@ -716,6 +868,21 @@ def split_markdown_front_matter(md):
 
     return front_matter, parts[1]
 
+def split_teacher_docs (contents):
+    tags = utils.markdown_to_html_tags (contents)
+    sections = []
+    for tag in tags:
+        # Sections are divided by h2 tags
+        if re.match ('^<h2>', str (tag)):
+            tag = tag.contents [0]
+            # We strip `page_title: ` from the first title
+            if len (sections) == 0:
+                tag = tag.replace ('page_title: ', '')
+            sections.append ({'title': tag, 'content': ''})
+        else:
+            sections [-1] ['content'] += str (tag)
+
+    return sections
 
 def render_main_menu(current_page):
     """Render a list of (caption, href, selected, color) from the main menu."""
@@ -723,23 +890,26 @@ def render_main_menu(current_page):
         caption=item.get(requested_lang(), item.get('en', '???')),
         href='/' + item['_'],
         selected=(current_page == item['_']),
-        accent_color=item.get('accent_color', 'white')
+        accent_color=item.get('accent_color', 'white'),
+        short_name=item['_']
     ) for item in main_menu_json['nav']]
 
 # *** PROGRAMS ***
+
+@app.route('/programs_list', methods=['GET'])
+@requires_login
+def list_programs (user):
+    return {'programs': DATABASE.programs_for_user(user['username'])}
 
 # Not very restful to use a GET to delete something, but indeed convenient; we can do it with a single link and avoiding AJAX.
 @app.route('/programs/delete/<program_id>', methods=['GET'])
 @requires_login
 def delete_program (user, program_id):
-    result = db_get ('programs', {'id': program_id})
+    result = DATABASE.program_by_id(program_id)
     if not result or result ['username'] != user ['username']:
         return "", 404
-    db_del ('programs', {'id': program_id})
-    program_count = 0
-    if 'program_count' in user:
-        program_count = user ['program_count']
-    db_set ('users', {'username': user ['username'], 'program_count': program_count - 1})
+    DATABASE.delete_program_by_id(program_id)
+    DATABASE.increase_user_program_count(user['username'], -1)
     return redirect ('/programs')
 
 @app.route('/programs', methods=['POST'])
@@ -747,68 +917,68 @@ def delete_program (user, program_id):
 def save_program (user):
 
     body = request.json
-    if not type_check (body, 'dict'):
+    if not isinstance (body, dict):
         return 'body must be an object', 400
-    if not object_check (body, 'code', 'str'):
+    if not isinstance (body.get('code'), str):
         return 'code must be a string', 400
-    if not object_check (body, 'name', 'str'):
+    if not isinstance (body.get('name'), str):
         return 'name must be a string', 400
-    if not object_check (body, 'level', 'int'):
+    if not isinstance (body.get('level'), int):
         return 'level must be an integer', 400
     if 'adventure_name' in body:
-        if not object_check (body, 'adventure_name', 'str'):
+        if not isinstance (body.get('adventure_name'), str):
             return 'if present, adventure_name must be a string', 400
 
-    # We execute the saved program to see if it would generate an error or not
-    error = None
-    try:
-        hedy_errors = TRANSLATIONS.get_translations(requested_lang(), 'HedyErrorMessages')
-        result = hedy.transpile(body ['code'], body ['level'])
-    except hedy.HedyException as E:
-        error_template = hedy_errors[E.error_code]
-        error = error_template.format(**E.arguments)
-    except Exception as E:
-        error = str(E)
-
-    name = body ['name']
-
-    # If name ends with (N) or (NN), we strip them since it's very likely these addenda were added by our server to avoid overwriting existing programs.
-    name = re.sub (' \(\d+\)$', '', name)
-    # We check if a program with a name `xyz` exists in the database for the username. If it does, we exist whether `xyz (1)` exists, until we find a program `xyz (NN)` that doesn't exist yet.
+    # We check if a program with a name `xyz` exists in the database for the username.
     # It'd be ideal to search by username & program name, but since DynamoDB doesn't allow searching for two indexes at the same time, this would require to create a special index to that effect, which is cumbersome.
     # For now, we bring all existing programs for the user and then search within them for repeated names.
-    existing = db_get_many ('programs', {'username': user ['username']}, True)
-    name_counter = 0
-    for program in existing:
-        if re.match ('^' + re.escape (name) + '( \(\d+\))*', program ['name']):
-            name_counter = name_counter + 1
-    if name_counter:
-        name = name + ' (' + str (name_counter) + ')'
+    programs = DATABASE.programs_for_user(user ['username'])
+    program_id = uuid.uuid4().hex
+    overwrite = False
+    for program in programs:
+        if program ['name'] == body ['name']:
+            overwrite = True
+            program_id = program ['id']
+            break
 
     stored_program = {
-        'id': uuid.uuid4().hex,
+        'id': program_id,
         'session': session_id(),
         'date': timems (),
         'lang': requested_lang(),
         'version': version(),
         'level': body ['level'],
         'code': body ['code'],
-        'name': name,
-        'server_error': error,
+        'name': body ['name'],
         'username': user ['username']
     }
 
     if 'adventure_name' in body:
         stored_program ['adventure_name'] = body ['adventure_name']
 
-    db_set('programs', stored_program)
+    DATABASE.store_program(stored_program)
+    if not overwrite:
+        DATABASE.increase_user_program_count(user ['username'])
 
-    program_count = 0
-    if 'program_count' in user:
-        program_count = user ['program_count']
-    db_set('users', {'username': user ['username'], 'program_count': program_count + 1})
+    return jsonify({'name': body ['name'], 'id': program_id})
 
-    return jsonify({'name': name})
+@app.route('/programs/share', methods=['POST'])
+@requires_login
+def share_unshare_program(user):
+    body = request.json
+    if not isinstance (body, dict):
+        return 'body must be an object', 400
+    if not isinstance (body.get('id'), str):
+        return 'id must be a string', 400
+    if not isinstance (body.get('public'), bool):
+        return 'public must be a string', 400
+
+    result = DATABASE.program_by_id(body['id'])
+    if not result or result ['username'] != user ['username']:
+        return 'No such program!', 404
+
+    DATABASE.set_program_public_by_id(body ['id'], bool(body ['public']))
+    return jsonify({'id': body ['id']})
 
 @app.route('/translate/<source>/<target>')
 def translate_fromto(source, target):
@@ -867,14 +1037,37 @@ def update_yaml():
 
 # *** AUTH ***
 
-import auth
-auth.routes (app, requested_lang)
+from website import auth
+auth.routes (app, DATABASE, requested_lang)
+
+# *** TEACHER BACKEND
+
+from website import teacher
+teacher.routes (app, DATABASE, requested_lang)
 
 # *** START SERVER ***
 
+def on_server_start():
+    """Called just before the server is started, both in developer mode and on Heroku.
+
+    Use this to initialize objects, dependencies and connections.
+    """
+    pass
+
+
 if __name__ == '__main__':
-    # Threaded option to enable multiple instances for multiple user access support
-    if version() == 'DEV':
-        app.run(threaded=True, port=config ['port'], host="0.0.0.0")
-    else:
-        app.run(threaded=True, port=config ['port'])
+    # Start the server on a developer machine. Flask is initialized in DEBUG mode, so it
+    # hot-reloads files. We also flip our own internal "debug mode" flag to True, so our
+    # own file loading routines also hot-reload.
+    utils.set_debug_mode(True)
+
+    # If we are running in a Python debugger, don't use flasks reload mode. It creates
+    # subprocesses which make debugging harder.
+    is_in_debugger = sys.gettrace() is not None
+
+    on_server_start()
+
+    # Threaded option enables multiple instances for multiple user access support
+    app.run(threaded=True, debug=not is_in_debugger, port=config ['port'], host="0.0.0.0")
+
+    # See `Procfile` for how the server is started on Heroku.

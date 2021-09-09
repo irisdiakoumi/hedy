@@ -36,7 +36,7 @@
         `ask` hat sich in Level 2 geändert. Die Antwort speicherst Du auch unter einem Namen ab:
 
         ```
-        antwort is Wie heißt du?
+        antwort is ask Wie heißt du?
         ```
 
         `print` funktioniert immer noch wie in Level 1, und Du benötigst `echo` nicht mehr.
@@ -67,7 +67,7 @@
 3:
     start_code: "print 'Hallo Welt'"
     intro_text: |
-        `ask` ist in Level 3 immer noch dasselbe, aber `print` ist jetzt anders.
+        In Level 3 `print` und `ask` ändern.
 
         Du musst Text, den du genau so mit `print` ausgeben möchtest, in Anführungszeichen setzen.
 
@@ -91,13 +91,13 @@
             print 'Ich heisse ' name
     -   name: "ask"
         explanation: "Frage etwas mit `ask`."
-        example: "Beispiel: farbe is ask Was ist deine Lieblingsfarbe?"
+        example: "Beispiel: farbe is ask 'Was ist deine Lieblingsfarbe?'"
         demo_code: |-
-            farbe is ask Was ist deine Lieblingsfarbe?
+            farbe is ask 'Was ist deine Lieblingsfarbe?'
             print 'Du magst am liebsten ' farbe
 4:
     start_code: |-
-        name is ask Wie heisst du?
+        name is ask 'Wie heisst du?'
         if name is Hedy print 'Toll!' else print 'Blöd'
     intro_text: |
         `ask` und `print` funktionieren immer noch wie in Level 3.
@@ -106,7 +106,7 @@
 
         ## Beispiel Hedy Code
         ```
-        Name ist ask wie ist Ihr Name?
+        Name is ask 'wie ist Ihr Name?'
         if Name is Hedy print 'Toll!' else print 'Blöd!'
         ```
 
@@ -123,15 +123,15 @@
         demo_code: "print 'Hallo. Willkommen bei Hedy.'"
     -   name: "ask"
         explanation: "Frage etwas mit `ask`."
-        example: "Beispiel: farbe is ask Was ist deine Lieblingsfarbe?"
+        example: "Beispiel: farbe is ask 'Was ist deine Lieblingsfarbe?'"
         demo_code: |-
-            farbe is ask Was ist deine Lieblingsfarbe?
+            farbe is ask 'Was ist deine Lieblingsfarbe?'
             print 'Du magst am liebsten ' farbe
     -   name: "if"
         explanation: "Treffe eine Auswahl mit `if` und `else`"
         example: "Beispiel: if farbe is grün print 'Hübsch!' else print 'Bäh'"
         demo_code: |-
-            farbe is ask Was ist deine Lieblingsfarbe?
+            farbe is ask 'Was ist deine Lieblingsfarbe?'
             if farbe is grün print 'Hübsch!' else print 'Bäh'
 5:
     start_code: "repeat 3 times print 'Hedy macht Spaß!'"
@@ -154,21 +154,21 @@
         demo_code: "print 'Hallo. Willkommen bei Hedy.'"
     -   name: "ask"
         explanation: "Frage etwas mit `ask`."
-        example: "Beispiel: farbe is ask Was ist deine Lieblingsfarbe?"
+        example: "Beispiel: farbe is ask 'Was ist deine Lieblingsfarbe?'"
         demo_code: |-
-            farbe is ask Was ist deine Lieblingsfarbe?
+            farbe is ask 'Was ist deine Lieblingsfarbe?'
             print 'Du magst am liebsten ' farbe
     -   name: "if"
         explanation: "Treffe eine Auswahl mit `if` und `else`"
         example: "Beispiel: if farbe is grün print 'Hübsch!' else print 'Bäh'"
         demo_code: |-
-            farbe is ask Was ist deine Lieblingsfarbe?
+            farbe is ask 'Was ist deine Lieblingsfarbe?'
             if farbe is grün print 'Hübsch!' else print 'Bäh'
     -   name: "repeat"
         explanation: "`repeat` und `if` kombiniert"
         example: "Beispiel: if farbe is grün repeat 3 times print 'Hübsch!' else repeat 5 times print 'Bäh'"
         demo_code: |-
-            farbe is ask Was ist deine Lieblingsfarbe?
+            farbe is ask 'Was ist deine Lieblingsfarbe?'
             if farbe is grün repeat 3 times print 'Hübsch!' else repeat 5 times print 'Bäh'
 6:
     start_code: "print '5 mal 5 ist ' 5 * 5"
@@ -196,15 +196,15 @@
         demo_code: "print '5 mal 5 ist ' 5 * 5"
     -   name: "`ask` und `if` mit Berechnungen"
         explanation: "Frage nach einer Rechenaufgabe."
-        example: "Beispiel: antwort is ask Was ist 10 plus 10?"
+        example: "Beispiel: antwort is ask 'Was ist 10 plus 10?'"
         demo_code: |-
-            antwort is ask Was ist 10 plus 10?
+            antwort is ask 'Was ist 10 plus 10?'
             if antwort is 20 print 'Ja!' else print 'Ups'
     -   name: "repeat"
         explanation: "`repeat` und `if` kombiniert"
         example: "Beispiel: if antwort is 50 repeat 3 times print 'Richtig!' else repeat 5 times print 'Ups'"
         demo_code: |-
-            antwort is ask Was ist 5 mal 10?
+            antwort is ask 'Was ist 5 mal 10?'
             if antwort is 50 repeat 3 times print 'Richtig!' else repeat 5 times print 'Ups'
 7:
     start_code: |-
@@ -228,7 +228,7 @@
 
         ## Beispiel Hedy-Code
         ```
-        farbe is ask Was ist deine Lieblingsfarbe?
+        farbe is ask 'Was ist deine Lieblingsfarbe?'
         if farbe is grün
             repeat 3 times
                 print 'Hübsch!'
@@ -244,9 +244,9 @@
         demo_code: "print '5 mal 5 ist ' 5 * 5"
     -   name: "`if` mit mehreren Zeilen"
         explanation: "Frage nach einer Summe und prüfe, ob die Antwort richtig ist. Wir können jetzt zwei Zeilen ausgeben."
-        example: "Beispiel: antwort is ask Was ist 5 plus 5?"
+        example: "Beispiel: antwort is ask 'Was ist 5 plus 5?'"
         demo_code: |-
-            antwort is ask Was ist 5 plus 5?
+            antwort is ask 'Was ist 5 plus 5?'
             if antwort is 10
                 print 'Gut gemacht!'
                 print 'Die Antwort ist wirklich ' antwort
@@ -257,7 +257,7 @@
         explanation: "`if` und `repeat` kombiniert"
         example: "Beispiel: if farbe is grün repeat 3 times print 'Hübsch!' else repeat 5 times print 'Bäh'"
         demo_code: |-
-            farbe is ask Was ist deine Lieblingsfarbe?
+            farbe is ask 'Was ist deine Lieblingsfarbe?'
             if farbe is grün
                 repeat 3 times
                     print 'Hübsch!'
@@ -322,7 +322,7 @@
     start_code: |-
         for i in range 1 to 3:
             for j in range 1 to 5:
-            print 'wir sind in Runde: ' i ' bei Nummer: ' j
+                print 'wir sind in Runde: ' i ' bei Nummer: ' j
     intro_text: |-
         Ab jetzt können wir eine Schleife öfters wiederholen. 
         Im Beispiel zählen wir bis 5 und machen das 3 Mal. 
@@ -472,7 +472,7 @@
         for i in range(1,10):
             # Wir werden die Multiplikationstabelle der 5 abfragen
             antwort is input('Was ergibt ' i ' mal 5?')
-            # Wir prüfen, ob die Antwort mit unserer übereinstimmt
+            # Wir prüfen ob die Antwort mit unserer übereinstimmt
             korrekte_antwort is i * 5
             if antwort is korrekte_antwort:
                 print(antwort ' ist korrekt!')
@@ -490,7 +490,7 @@
         demo_code: |-
             # Dieses Programm gibt Hallo! aus
             # Es ist in Hedy erstellt worden
-            # Es macht nichts, außer Hallo! zu auszugeben
+            # Es macht nichts außer Hallo! zu auszugeben
             print('Hallo!')
 16:
     start_code: |-
@@ -526,7 +526,7 @@
 17:
     start_code: |-
         richtige_antwort is False
-        # wir fahren fort, bis die richtige Antwort gegeben wurde!
+        # wir fahren fort bis die richtige Antwort gegeben wurde!
         while richtige_antwort is False:
             antwort is input('Wieviel ist 5 mal 5?')
             if antwort is 25:
@@ -543,7 +543,7 @@
         example: "while richtige_antwort is False"
         demo_code: |-
             richtige_antwort is False
-            # wir fahren fort, bis die richtige Antwort gegeben wurde!
+            # wir fahren fort bis die richtige Antwort gegeben wurde!
             while richtige_antwort is False:
                 antwort is input('Wieviel ist 5 mal 5?')
                 if antwort is 25:
@@ -557,7 +557,7 @@
         example: "while zaehler < 3"
         demo_code: |-
             zaehler is 1
-            # wir fahren fort, bis der Zählerstand 3 ist!
+            # wir fahren fort bis der Zählerstand 3 ist!
             while zaehler < 3:
                 print('Wir machen dies noch ' 3 - zaehler ' mal.')
                 zaehler is zaehler + 1
