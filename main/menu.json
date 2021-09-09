@@ -7,11 +7,12 @@
       "es": "Inicio",
       "fr": "Page principale",
       "pt_br": "Início",
-      "de": "Start",
+      "de": "Willkommen",
       "sw": "Anza",
       "zh": "主页",
       "el": "Αρχική",
-      "hu": "Kezdőlap"
+      "hu": "Kezdőlap",
+      "cs": "Domů"
     },
     {
       "_": "hedy",
@@ -25,47 +26,21 @@
       "sw": "Hedy",
       "zh": "海迪",
       "el": "Hedy",
-      "accent_color": "blue-200"
-    },
-    {
-      "_": "press",
-      "en": "Press",
-      "nl": "Pers",
-      "es": "Prensa",
-      "fr": "Presse",
-      "pt_br": "Mídia",
-      "de": "Presse",
-      "sw": "Habari",
-      "zh": "相关新闻",
-      "el": "Τύπος",
-      "hu": "Média"
-    },
-    {
-      "_": "contact",
-      "en": "Contact",
-      "nl": "Contact",
-      "es": "Contacto",
-      "fr": "Contacter",
-      "pt_br": "Contato",
-      "de": "Kontakt",
-      "sw": "Wasiliana",
-      "zh": "联系我们",
-      "el": "Επικοινωνία",
-      "hu" :"Kapcsolat"
+      "cs": "Hedy"
     },
     {
       "_": "learn-more",
       "en": "Learn more",
       "nl": "Meer info",
       "es": "Aprende más",
-      "fr": "Learn more",
-      "pt_br": "Learn more",
-      "de": "Learn more",
+      "fr": "Apprendre Plus",
+      "pt_br": "Saber mais",
       "sw": "Jifunze zaidi",
       "de": "Mehr Infos",
       "zh": "了解更多",
       "el": "Μάθε περισσότερα",
-      "hu": "Tudj meg többet"
+      "hu": "Tudj meg többet",
+      "cs": "Zjisti víc"
     },
     {
       "_": "for-teachers",
@@ -73,7 +48,9 @@
       "en": "For teachers",
       "de": "Für Lehrende",
       "zh": "教学资源",
-      "hu": "Tanároknak"
+      "hu": "Tanároknak",
+      "cs": "Pro učitele",
+      "es": "Para docentes"
     }
   ]
 }
