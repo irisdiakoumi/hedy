@@ -1,9 +1,5 @@
-program: _EOL* command (_SPACE)* (_EOL+ command (_SPACE)*)* _EOL* //lines may end on spaces and might be separated by many newlines
-command: print | repeat | ifs elses? | turtle | ask | assign_list | list_access_var | assign  //placing it here means print is will print 'is' and print is Felienne will print 'is Felienne'
+command:+= repeat -= error_print_no_quotes
+_if_less_command:+= repeat -= error_print_no_quotes
 
-repeat: _REPEAT _SPACE (NUMBER | var) _SPACE _TIMES _EOL (_SPACE command) (_EOL _SPACE command)* _EOL "end-block"
-
-// from level 7 on if is implemented slightly differently
-elses: _EOL (_SPACE)* _ELSE _EOL (_SPACE command) (_EOL _SPACE command)* _EOL "end-block"
-//'if' cannot be used in Python, hence the name of the rule is 'ifs'
-ifs: _IF _SPACE condition _EOL (_SPACE command) (_EOL _SPACE command)* _EOL "end-block"
+//new in level 6
+repeat: _REPEAT (INT | var_access) _TIMES _SPACE command

@@ -1,66 +1,45 @@
-Contributing to Hedy
-======================
-
-Hedy is now available in Dutch, French, English, Brazilian Portugese, Greek Mandarin, Hungarian and Spanish, but we'd love to support more languages!
-
-Help Hedy with translations (easy, no programming needed!)
+Helping build Hedy
 ------------
 
-The easiest way to translate Hedy is by using or translation UI website!
+We would be grateful if you help make Hedy better! First you will want to follow the instructions below to run the code locally and configuring your manchine as explained below. After that, you want to look at these things:
 
-Simply go to https://www.hedycode.com/translate/en/new and translate our texts that are shown on the left in the boxes on the right. When you are done, you can use the three download button at the end of the page, and [send us the files](mailto:hedy@felienne.com).
+**Open issues**
 
-![image](https://user-images.githubusercontent.com/1003685/116811756-3ed55f80-ab4b-11eb-881a-85677a30ef5e.png)
+First have a look at the open issues. [Good first issues](https://github.com/Felienne/hedy/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22) are issues that we think are doable for people new to the project. But of course, you may pick up other issues too! Issues that are currently unassigned, are not planning to be picked up by us in the near future. For issues that look interesting but are already assigned, just reply on the issue to see if your help can be used.
 
-You can also use this interface to extend or repair existing translations, then you have to use the iso code of the langage that you want to work with in the url instead of new, f.e. https://www.hedycode.com/translate/en/es for Spanish. That will show the existing translated texts for you to update. After you have made changes again download the files and send them to us per email.
+**Project boards**
 
+The core team (currently consisting of [Felienne](https://github.com/Felienne), [boryanagoncharenko](https://github.com/boryanagoncharenko), [Jesus Pelay](https://github.com/jpelay) and [tibiba](https://github.com/tibiba)) keeps track of the issues they will work on in the future on the [Core Team Project Board](https://github.com/Felienne/hedy/projects/5). If there are issues on the Code team Board that you want to help out with, that is always welcome, the core team is kind of busy with many things :)! But do [reach out](mailto:hedy@felienne.com) to prevent us from working on the same thing.
 
-Help Hedy with translations (in the code base, some coding experience needed)
-------------
+Other project boards are student projects that keep track of their own issues, these are typically not open for contributors to work on since we want the students to do their own projects :)
 
-If you would like to add a new translation, there are four places where files are located that need to be translated:
+**Discussions**
 
-1) The folder [level-defaults](https://github.com/Felienne/hedy/blob/main/coursedata/level-defaults/) has a file for each language. That file controls what the landing page for each levels looks like. It is probably easiest to copy the [English file](https://github.com/Felienne/hedy/blob/main/coursedata/level-defaults/en.yaml), rename it and translate that. Tip: example variables can be translated too, that is probably helpful for learners!
+The [Discussion board](https://github.com/Felienne/hedy/discussions) has ideas that are not yet detailed enough to be put into issue, like big new features or overhuals of the language or architecture. If you are interested in picking up such a large feature do [let us know](mailto:hedy@felienne.com) and read the corresponding discussion to see what has alrady been considered.
 
-2) In the folder [texts](https://github.com/Felienne/hedy/tree/main/coursedata/texts) there is a file for each language too. That file translate UI-elements like menu headers, and, important, the error messages Hedy programmers will see. As above, copying the [English file](https://github.com/Felienne/hedy/blob/main/coursedata/texts/en.yaml) and translate that.
+**For newcomers: No PR without an issue and no "issue + PR"**
 
-3) The [folder](https://github.com/Felienne/hedy/tree/main/coursedata/adventures) that control the assignments kids see in the user interface for each of the levels. While not mandatory, the assignments in this section are of help for kids to better explore each level. If you do not translate them, the English version will be shown.
-
-4) *optional* The folder [main](https://github.com/Felienne/hedy/tree/main/main) controls the web pages around Hedy. [start](https://github.com/Felienne/hedy/blob/main/main/start-en.md) holds the content of the start page, and there are page with press, contact info too. These do not necessariyl have to be translated, if you don't people will then see the English version, but kids can still program in their own native language.
-
-
-Translated all of that?
-
-Two more small things to do!
-
-1) Add your language to the [menu](https://github.com/Felienne/hedy/blob/main/main/menu.json).
-
-2) Now go to [app.py](https://github.com/Felienne/hedy/blob/main/app.py) and add your language to this list:
-
-```
-ALL_LANGUAGES = {
-    'en': 'English',
-    'nl': 'Nederlands',
-    'es': 'Español',
-    'fr': 'Français',
-    'pt_br': 'Português',
-    'de': 'Deutsch',
-    'it': 'Italiano'
-}
-```
-
-In some places, we are missing translations to the existing language. You can find those locations as [issues](https://github.com/Felienne/hedy/issues?q=is%3Aissue+is%3Aopen+label%3A%22translation+needed%22)
-
+While we really love people to help out, we work and prioritize our work as a team and we have a lot of work still on our backlog. 'Random' pull requests can be overwhelming and not always helpful. If you want to help, please pick an open issue to work on. We have a few labeled "good first issue" to get started, or [reach out](mailto:hedy@felienne.com). We are always happy to jump on a call to chat about how you can help!!
 
 Run Hedy code on your machine
 ------------
 
-If you are going to contribute to the code of Hedy, you will probably want to run the code on your own computer. For this you need to install Python 3.6 or higher. Then, here's how to get started once you have downloaded or cloned the code:
+If you are going to contribute to the code of Hedy, you will probably want to run the code on your own computer. For this you need to:
+- install Python 3.7 or higher;
+- install Microsoft Visual C++ 14.0 or higher, which you can [download here](http://landinghub.visualstudio.com/visual-cpp-build-tools)
+Then, here's how to get started once you have downloaded or cloned the code:
 
 ```bash
 $ python3 -m venv .env
 $ source .env/bin/activate
 (.env)$ pip install -r requirements.txt
+```
+
+Or if you're on windows in a powershell window with py launcher installed:
+```bash
+> py -m venv .env
+> ./.env/Scripts/activate.ps1
+(.env)> pip install -r requirements.txt
 ```
 
 If you want to run the website version locally, run:
@@ -71,48 +50,111 @@ If you want to run the website version locally, run:
 To run the unit tests:
 
 ```bash
-(.env)$ python -m unittest discover -s tests
+(.env)$ python -m pytest
 ```
 
-To make debugging a lot more convenient, enable **development mode**. If you do this, any HTML templates and Python
-source files you change and save will automatically be reloaded.
+## Working on the web front-end in TypeScript/JavaScript
+Part of the code base of Hedy is written in Python, which runs on the server.
+The parts that run in the browser are written in TypeScript, and are compiled to
+JavaScript.
 
-(Be aware that your program may stop with a `SyntaxError` if you save a Python file
-while the code is not complete. If this happens too often because you reflexively hit Ctrl-S 😉
-you can wrap the command in a loop to restart the server quickly).
+So that most people won't have to install special tools, the generated
+JavaScript code is checked in. However, if you are working on the browser code,
+you need to edit the TypeScript source files and regenerate the JavaScript
+bundle by running:
 
+```
+# You only need to run 'npm ci' once to install the tools
+$ npm ci
 
-```bash
-(.env)$ env FLASK_ENV=development python app.py
-# or in a loop if it stops too often
-(.env)$ while true; do env FLASK_ENV=development python app.py; sleep 1; done
+# Afterwards run this:
+$ build-tools/heroku/generate-typescript --watch
 ```
 
-If you want to run the website locally, but would prefer to use Docker instead of installing python, you can build a container image and run it like so:
+The ```--watch``` command will keep looking for changes and automatically update the files. 
+To just keep it running while you are working on the front-end code. 
+If you just want to run the code once, simply remove this parameter.
+Make sure to re-load your browser (and work in incognito mode) to see the changes. 
+These files are also automatically generated on deploy, so don't worry if you forget to generate them.
+
+## Working on the web front-end in Tailwind
+All the styling in our front-end HTML templates is done using the Tailwind library. 
+This library has generated classes for styling which we can call on HTML elements.
+To make sure you have access to all possible styling classes, generate the development css file:
+```
+$ ./build-tools/heroku/tailwind/generate-development-css
+```
+When merging we want to keep the CSS file as small as possible for performance reasons. 
+Tailwind has a built-in ```purge``` option to only generate CSS for classes that are actually being used.
+Please run the following command so Tailwind only generated actual used classes:
+```
+$ ./build-tools/heroku/tailwind/generate-css
+```
+For all possible styling classes and more, take a look at their [website](https://tailwindcss.com).
+If you want to combine different Tailwind classes into one class or one element, we can do this in the ```/build-tool/heroku/tailwind/styles.css``` file.
+By using the ```@apply``` attribute we can assign classes to other styling. For example, we styled the ```<h1>``` element with multiple Tailwind classes like this:
+```
+h1 {
+  @apply font-extralight text-4xl;
+}
+```
+If you want to use styling that is not available in the Tailwind library this can be added to the ```static/css/additional.css``` file.
+But please, try to use the Tailwind classes as much as possible as these are optimized and keep our code base consistent and readable.
+Also, please refrain from using inline CSS styling, as this makes the templates hard to read, maintain and alter.
+
+## Working with translations
+For our multilingual web structure we use a combination of YAML files and Babel to deliver language-dependent content.
+The adventures, level-defaults, mail-templates, achievements and quizzes are all stored using YAML files.
+All our front-end UI strings, error messages and other "small" translations are stored using Babel.
+To help translating any of these, please follow the explanation in TRANSLATING.md.
+
+However, when adding new content or implementing a feature that requires new translations you need to manually add these translation keys.
+When adding YAML related translations please add these to the corresponding YAML file in the ```/coursedata``` folder.
+Make sure that you comform to the already existing YAML structure.  As English is the fallback language, the translation should always be available in the english YAML file.
+Feel free to manually add the translation to as many languages as you know, but don't worry: otherwise these will be translated by other contributors through Weblate.
+
+When adding new Babel related translation the implementation is a bit more complex, but don't worry! It should al work fine with the following steps:
+1. First we add the translation "placeholder" to either the front-end or back-end
+    * When on the front-end (in a .html template) we do this like this: ```{{ _('test') }}```
+    * Notice that the ```{{ }}``` characters are Jinja2 template placeholders for variables
+    * When on the back-end we do this like this: ```gettext('test')```
+2. Next we run the following command to let Babel search for keys:
+    * ```pybabel extract -F babel.cfg -o messages.pot .```
+3. We now have to add the found keys to all translation files, with the following command:
+    * ```pybabel update -i messages.pot -d translations```
+4. All keys will be automatically stored in the /translations folder
+5. Search for the .po files for the languages you know and find the empty msgstr for your added key(s)
+6. Add your translations there, the other translation will hopefully be quickly picked up by other translators
+7. If you want to test it locally, run:
+    * ```pybabel compile -d translations```
+8. This action will also always be run on deployment to make sure the translations are up-to-date
+
+## Using Docker
+
+If you want to run the website locally, but would prefer to use Docker instead
+of installing python, you can build a container image and run it like so:
 
 ```bash
 docker build -t hedy .
 ```
-and then
+
+and then:
+
 ```bash
-docker run -it --rm -p 5000:5000 hedy
+docker run -it --rm -p 8080:8080 hedy
 ```
 
-If you don't want to use a website, you can run the code locally without the need of a website. To create a file use:
-```bash
-$ touch FILENAME.hedy
-```
-If you use a higher level than 1, specify the level at the top of the file by typing ```#LEVEL 1-8```. This will let the interpreter know which level you want to run the code on. Now to acctually run the code, type the following command in the terminal:
-```bash
-(.env)$ python runhedy.py FILENAME.hedy
-```
-If all did correctly, you will see the output of your code right into the terminal.
+## Testing Teacher facing features locally
 
-If you don't want to specify the level itself in the file, you can use the ```--level``` argument after the filename. You can do it like this:
-```bash
-(.env)$ python runhedy.py FILENAME.hedy --level 1-8
-```
-When you execute this, the interpreter will use the specified level.
+For some things like making classes you need a teacher's account and you ight want to test that locally. To do so, you have to first make an account, this works offline without issues. Then you have to run Hedy with the environment variable ADMIN_USER set to your username, f.e. ADMIN_USER=Pete. It works a bit differently in each IDE, this is whta it looks like for PyCharm:
+
+![image](https://user-images.githubusercontent.com/1003685/152981667-0ab1f273-c668-429d-8ac4-9dd554f9bab3.png)
+
+Once you have made yourself an admin, you can acess the admin interface on http://localhost:8080/admin. Go to the Users Overview, and on the users page, select the tickmark under Teacher to make your account a teacher:
+
+![image](https://user-images.githubusercontent.com/1003685/152981987-64010e8b-a850-4178-aa51-42b0f6cd3aeb.png)
+
+
 
 Pre-release environment
 -----------------------
@@ -141,7 +183,7 @@ on which IDE you are using. Here are the IDEs we know about:
 {
   // ...
   "yaml.schemas": {
-    "coursedata/adventures/adventures.schema.json": "adventures/*.yaml"
+    "content/adventures/adventures.schema.json": "adventures/*.yaml"
   }
 }
 ```
@@ -151,6 +193,6 @@ on which IDE you are using. Here are the IDEs we know about:
 * Open **Preferences**
 * Navigate to **Languages & Frameworks → Schemas and DTDs → JSON Schema Mappings**.
 * Click the **+** to add a new schema.
-  * Behind **Schema file or URL**, click the browse button and navigate to the `<your Hedy checkout>/coursedata/adventures/adventures.schema.json` file.
-  * Click the **+** at the bottom, select **Directory**. In the new line that appears, paste `coursedata/adventures`.
+  * Behind **Schema file or URL**, click the browse button and navigate to the `<your Hedy checkout>/content/adventures/adventures.schema.json` file.
+  * Click the **+** at the bottom, select **Directory**. In the new line that appears, paste `content/adventures`.
 * Click **OK** to close the window.

@@ -1,7 +1,24 @@
-print: _PRINT _SPACE (quoted_text | list_access | var_access | sum) (_SPACE (quoted_text | list_access | var_access | sum))*
-assign: var _SPACE _IS _SPACE sum | var _SPACE _IS _SPACE textwithoutspaces
-?sum: product | sum _SPACE* _ADD _SPACE* product -> addition | sum _SPACE* _SUBTRACT _SPACE* product -> substraction
-?product: atom | product _SPACE* _MULTIPLY _SPACE* atom -> multiplication | product _SPACE* _DIVIDE _SPACE* atom -> division
-?atom: NUMBER | var //TODO: means we cannot assign strings with spaces? would we want that?
+_print_argument: (_SPACE | quoted_text | list_access | print_expression)*
+?print_expression: INT | var_access | error_unsupported_number | expression
 
-textwithoutspaces: /([^\n, *+-\/]+)/ -> text //new cause in level 6 calculation elements need to be escaped too
+// redefining it entirely since it has many order-depending rules
+command: print | turtle | add | remove | sleep | error_print_no_quotes | ifelse | ifs | ask | list_access_var | assign | assign_list
+_if_less_command: print | turtle | add | remove | sleep | error_print_no_quotes | ask | list_access_var | assign | assign_list
+
+//splitting  these commands into two rules, one for equals and one for is so they can be properly handled in the translator
+ask: var (_IS | _EQUALS) _ASK (_print_argument)?
+
+equality_check: textwithoutspaces (_IS | _EQUALS) (textwithoutspaces | quoted_text)
+
+condition:+= equality_check -= equality_check
+
+list_access_var: var (_IS | _EQUALS) var _AT (INT | random)
+assign_list: var (_IS | _EQUALS) textwithspaces (_COMMA textwithspaces)+
+assign: var (_IS | _EQUALS) expression | var ( _IS  | _EQUALS) textwithoutspaces | var (_IS | _EQUALS) textwithspaces
+
+?expression: simple_expression | expression _MULTIPLY atom -> multiplication | expression _DIVIDE atom -> division | expression _PLUS atom -> addition | expression _MINUS atom -> subtraction
+?simple_expression: atom _MULTIPLY atom -> multiplication | atom _DIVIDE atom -> division | atom _PLUS atom -> addition | atom _MINUS atom -> subtraction
+?atom: INT | var_access | error_unsupported_number | textwithoutspaces
+error_unsupported_number: /([-+]?(\d+[\.،,，]\d+))/ -> error_unsupported_number
+
+textwithoutspaces: /(?:[^#\n،,， *+\-\/eias]|e(?!lse)|i(?!f)|s(?!i|inon|ino)|a(?!nders|ls))+/ -> text

@@ -1,6 +1,6 @@
-// Level 15 add comments
+command:+= while_loop
 
-command: print | ifs (elifs)* elses? | input | for_loop | assign_list | list_access_var | change_list_item| comment | assign
+// new : while loop
+while_loop: _WHILE (condition) _EOL (_SPACE command) (_EOL _SPACE command)* _EOL _END_BLOCK
 
-//new for level 15
-comment: _HASH (textwithspaces)*
+

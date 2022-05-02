@@ -1,9 +1,13 @@
-// Level 14 adds and and or
+// adds comparisons
 
-ifs: _IF _SPACE (condition|andcondition|orcondition) _COLON _EOL (_SPACE command) (_EOL _SPACE command)* _EOL "end-block" //'if' cannot be used in Python, hence the name of the rule is 'ifs'
-elifs: _EOL (" ")* _ELIF _SPACE (condition|andcondition|orcondition) _COLON _EOL (_SPACE command) (_EOL _SPACE command)* _EOL "end-block"
-condition: (equality_check|in_list_check)
+condition:+= equality_check_dequals | smaller | bigger | not_equal | smaller_equal | bigger_equal
 
+equality_check: comparison_arg (_IS | _EQUALS) comparison_arg
+equality_check_dequals: comparison_arg  _DOUBLE_EQUALS  comparison_arg
+smaller: comparison_arg  _SMALLER  comparison_arg
+bigger: comparison_arg  _LARGER  comparison_arg
+smaller_equal: comparison_arg  _SMALLER_EQUALS  comparison_arg
+bigger_equal: comparison_arg  _LARGER_EQUALS  comparison_arg
+not_equal: comparison_arg  _NOT_EQUALS  comparison_arg
 
-andcondition: (equality_check|in_list_check) (_SPACE _AND _SPACE condition)*
-orcondition: (equality_check|in_list_check) (_SPACE _OR _SPACE condition)*
+?comparison_arg: var_access | text_in_quotes | NUMBER

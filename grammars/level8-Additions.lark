@@ -1,7 +1,14 @@
-command: print | ifs elses? | ask | for_loop | assign_list | list_access_var | assign
+command:+= ifs elses?
 
-//new for level 8, for loop and the end-blocks
-for_loop: _FOR _SPACE (NAME | var) _SPACE _IN _SPACE _RANGE _SPACE (NUMBER | var) _SPACE _TO _SPACE (NUMBER | var) _EOL (_SPACE command) (_EOL _SPACE command)* _EOL "end-block"
+repeat: _REPEAT (INT | var_access) _TIMES _SPACE? _EOL (_SPACE command) (_EOL _SPACE command)* _EOL _END_BLOCK
 
-elses: _EOL (_SPACE)* _ELSE _EOL (_SPACE command) (_EOL _SPACE command)* _EOL "end-block"
-ifs: _IF _SPACE condition _EOL (_SPACE command) (_EOL _SPACE command)* _EOL "end-block" //'if' cannot be used in Python, hence the name of the rule is 'ifs'
+// FH jan 2022 (#1817) we can allow unquoted rhs's again cause there now is a line break after
+// not sure of we want it, but we could
+condition: equality_check | in_list_check
+equality_check: textwithoutspaces (_IS | _EQUALS) textwithoutspaces (_SPACE textwithoutspaces)*
+
+
+// from level 8 on if is implemented slightly differently
+elses: _EOL (_SPACE)* _ELSE (_SPACE)* _EOL (_SPACE command) (_EOL _SPACE command)* _EOL _END_BLOCK
+//'if' cannot be used in Python, hence the name of the rule is 'ifs'
+ifs: _IF condition _EOL (_SPACE command) (_EOL _SPACE command)* _EOL _END_BLOCK

@@ -1,0 +1,423 @@
+@tailwind base;
+
+html {
+  @apply font-light;
+  /* https://stackoverflow.com/questions/1417934/how-to-prevent-scrollbar-from-repositioning-web-page */
+  overflow-x: hidden;
+  margin-right: calc(-1 * (100vw - 100%));
+}
+
+.font-slab {
+  font-family: 'Zilla Slab', serif;
+}
+
+h1 {
+  @apply font-extralight text-4xl;
+}
+
+h2 {
+  @apply font-bold text-2xl;
+}
+
+h3 {
+  @apply font-bold text-xl;
+}
+
+h4 {
+  @apply font-bold text-base;
+}
+
+* + p, * + ul, * + ol, * + pre {
+  @apply mt-4;
+}
+
+a {
+  @apply font-semibold text-blue-400;
+  text-decoration: underline;
+}
+
+strong {
+  @apply font-bold;
+}
+
+.btn-shape {
+  @apply font-bold py-2 px-4 border-b-4 rounded;
+  display: inline-block;
+}
+
+.green-btn {
+  @apply btn-shape;
+  @apply bg-green-500 text-white border-green-700;
+}
+
+.green-btn:hover {
+  @apply bg-green-400 border-green-500;
+}
+
+.red-btn {
+  @apply btn-shape;
+  @apply bg-red-500 text-white border-red-700;
+}
+
+.red-btn:hover {
+  @apply bg-red-400 border-red-500;
+}
+
+.yellow-btn {
+  @apply btn-shape;
+  @apply bg-yellow-500 text-black border-yellow-700;
+}
+
+.yellow-btn:hover {
+  @apply bg-yellow-400 border-yellow-500;
+}
+
+.blue-btn {
+  @apply btn-shape;
+  @apply bg-blue-500 text-white border-blue-700;
+}
+
+.blue-btn:hover {
+  @apply bg-blue-400 border-blue-500;
+}
+
+/* Styles only for use in MarkDown blocks */
+.markdown {
+  @apply text-xl text-gray-800 leading-normal;
+}
+
+.markdown li + li, .markdown li > p + p {
+  @apply my-2;
+}
+.markdown strong {
+  @apply font-bold;
+}
+.markdown * + h1 {
+  @apply leading-tight mb-2 mt-10;
+}
+
+h2 {
+  @apply font-slab font-medium text-blue-500;
+  @apply leading-tight text-2xl mb-2 mt-10;
+}
+
+h2:first-child { margin-top: 0; }
+
+h3 {
+  @apply font-slab font-bold text-blue-700 italic;
+  @apply leading-tight text-xl mt-4 mb-1;
+}
+
+h4 {
+  @apply mt-4 mb-2;
+}
+
+pre, code {
+}
+
+.markdown code {
+  @apply py-1 px-1 text-base;
+}
+
+pre code {
+  @apply block bg-gray-200 py-2 px-4 my-2 rounded text-base border-gray-300 border;
+  @apply text-red-600;
+}
+
+pre {
+  white-space: pre-wrap;
+}
+
+/* Code in a fenced code block (``` in MarkDown) */
+pre code {
+  font-size: 100%;
+  color: white;
+}
+
+/* All code (` and ```) */
+code {
+  @apply font-mono inline rounded py-1 px-2 font-normal;
+  background: #272822 !important;
+  color: #ff6188;
+  font-size: 90%;
+}
+
+.markdown blockquote {
+  @apply border-l-4 border-gray-300 ltr:pl-4 rtl:pr-4 italic;
+}
+
+@tailwind components;
+
+@tailwind utilities;
+
+.btn {
+  @apply btn-shape;
+  @apply bg-blue-500 text-white border-blue-700 no-underline;
+}
+
+.btn:hover {
+  @apply bg-blue-400 border-blue-500;
+}
+
+.menubar-btn {
+  @apply text-white no-underline font-slab font-semibold border-b-4 tracking-wide text-xl py-3 ltr:mr-4 rtl:ml-4;
+}
+
+@screen lg {
+  .menubar-btn {
+    @apply px-2;
+  }
+}
+@screen xl {
+  .menubar-btn {
+    @apply px-4;
+  }
+}
+
+.codebar-btn {
+  @apply text-black no-underline border-white tracking-wide font-normal px-4 py-3 ltr:mr-4 rtl:ml-4;
+}
+
+#output {
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', 'Consolas', 'source-code-pro', monospace;
+}
+
+.dropdown:hover .dropdown-menu {
+  display: block;
+}
+
+.text-shadow {
+  text-shadow: 0 2px 4px rgba(0,0,0,0.10);
+}
+
+.text-shadow-md {
+  text-shadow: 0 4px 8px rgba(0,0,0,0.12), 0 2px 4px rgba(0,0,0,0.08);
+}
+
+.text-shadow-lg {
+  text-shadow: 0 15px 30px rgba(0,0,0,0.11), 0 5px 15px rgba(0,0,0,0.08);
+}
+
+.text-shadow-none {
+  text-shadow: none;
+}
+
+/* Lists */
+
+ul {
+    list-style: disc outside none;
+    @apply ltr:ml-8 rtl:mr-8;
+}
+
+ol {
+    list-style: decimal outside none;
+    @apply ltr:ml-8 rtl:mr-8;
+}
+
+/* AUTH */
+input[type=checkbox] {
+  @apply appearance-none border border-gray-400 w-4 h-4;
+}
+
+#signup input:required, #signup select:required, #update_profile input:required, #change_password input:required {
+  @apply border border-red-400;
+}
+
+/* Make this !important to it over-writes the red required border when valid */
+input:required:valid, select:required:valid {
+  @apply border-green-400 !important;
+}
+
+input[type=checkbox]:checked {
+  @apply bg-green-400 border-green-600;
+}
+
+input, select {
+  @apply border border-gray-400;
+}
+
+table.users thead {
+  font-weight: bold;
+}
+
+table.users td {
+  padding: 10px;
+  border: solid 1px gray;
+}
+
+/* Keep the class name the same to prevent complex restructuring -> the RTL version is actually left-hand-shadow */
+/* https://stackoverflow.com/questions/17572619/how-to-create-a-inset-box-shadow-only-on-one-side */
+body[dir='ltr'] .right-hand-shadow {
+  box-shadow: inset -7px 0 9px -7px rgba(0,0,0,0.4);
+}
+
+body[dir='rtl'] .right-hand-shadow {
+  box-shadow: inset 7px 0 9px -7px rgba(0,0,0,0.4);
+}
+
+.tab {
+  @apply py-2 px-1 mt-2 bg-gray-100 rounded-t-lg border-t-8 border-gray-300 text-sm cursor-pointer;
+  box-shadow:
+    /* bottom */ inset 0px -4px 4px -1px rgba(0,0,0,0.1);
+}
+
+.teacher_tab {
+  @apply border-green-300;
+}
+.money_tab {
+  @apply border-green-600 bg-green-400 text-white font-semibold;
+}
+
+@screen lg {
+  .tab {
+    @apply px-2;
+  }
+}
+@screen xl {
+  .tab {
+    @apply px-4;
+  }
+}
+
+.tab + .tab {
+  box-shadow:
+    /* bottom */ inset 0px -4px 4px -1px rgba(0,0,0,0.1),
+    /* left */ inset 4px 0px 4px -1px rgba(0,0,0,0.1);
+}
+
+.tab-selected {
+  @apply mt-0 pt-2 bg-white text-black font-normal rounded-t-lg border-t-8 border-r border-l border-pink-500;
+  box-shadow: none !important;
+}
+
+/* EDITOR WARNINGS & ERRORS */
+
+div#errorbox, div#warningbox {
+   position: relative;
+}
+
+p.close-dialog {
+   @apply ltr:right-[5px] rtl:left-[5px];
+   font-weight: bold;
+   position: absolute;
+   top: 5px;
+   cursor: pointer;
+}
+
+.editor-error {
+  @apply bg-red-600;
+  position: absolute;
+}
+
+/* DOCS */
+
+.expandable-docs-text h1 {
+   margin-top: 30px;
+   margin-bottom: 30px;
+}
+
+.touched {
+  @apply bg-green-200;
+}
+
+/* QUIZ */
+
+#quiz-iframe {
+  height: 72rem;
+  -moz-transform-origin: 0 0;
+  -o-transform-origin: 0 0;
+  -webkit-transform-origin: 0 0;
+}
+
+
+/* Stats */
+.stats-period-toggle.active {
+  color: black;
+  text-decoration: none;
+  cursor: default;
+  font-weight: normal;
+}
+
+.stats-legend {
+  list-style-type: none;
+}
+
+.stats-legend-item {
+  display: inline;
+  padding-right: 15px;
+  cursor: default;
+}
+
+.stats-legend-color-box {
+  width: 45px;
+  height: 12px;
+  display:inline-block;
+  margin-right: 5px;
+}
+
+/* Tab content - closed */
+.accordion .accordion-tab input ~ .tab-content {
+  max-height: 0;
+  -webkit-transition: max-height .35s;
+  -o-transition: max-height .35s;
+  transition: max-height .35s;
+}
+
+/* Accordion icon */
+.accordion .accordion-tab label::before {
+  @apply ltr:float-right rtl:float-left ltr:right-0 rtl:left-0;
+  top: 0;
+  display: block;
+  width: 1.5em;
+  height: 1.5em;
+  line-height: 1.5;
+  font-size: 1.25rem;
+  font-weight: bolder;
+  text-align: center;
+  -webkit-transition: all .35s;
+  -o-transition: all .35s;
+  transition: all .35s;
+}
+
+/* Tab content - open */
+.accordion .accordion-tab input:checked ~ .tab-content {
+  max-height: 3000vh;
+}
+
+/* Accordion icon formatting - closed */
+.accordion .accordion-tab input[type=checkbox] + label::before {
+  @apply ltr:right-[5px] rtl:left-[5px];
+  content: ">";
+  transform: rotate(90deg);
+}
+
+/* Accordion icon formatting - open */
+.accordion .accordion-tab input[type=checkbox]:checked + label::before {
+  transform: rotate(270deg);
+}
+
+/* Programs */
+.explore-program-box {
+  @apply w-64 h-64 rounded-lg border border-gray-700 m-4 relative bg-blue-200;
+}
+
+/* Developers mode toggle */
+.toggle-circle {
+  @apply ltr:left-1 rtl:right-1;
+  top: 0.2rem;
+  transition: all 0.5s ease-in-out;
+}
+
+body[dir='rtl'] input:checked ~ .toggle-circle {
+  transform: translateX(-100%);
+  @apply bg-green-400;
+}
+
+body[dir='ltr'] input:checked ~ .toggle-circle {
+  transform: translateX(100%);
+  @apply bg-green-400;
+}
+
+input:checked ~ .toggle-path {
+  @apply bg-gray-600;
+}

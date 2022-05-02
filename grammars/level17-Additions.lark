@@ -1,5 +1,18 @@
-// Level 17 adds the while loop
+// We add the : at the end of if and else and elif and for/while
 
-command: print | ifs (elifs)* elses? | input | for_loop | while_loop | assign_list | list_access_var | change_list_item| comment | assign
+command:+= ifs (elifs)* elses? -= ifs elses?
 
-while_loop: _WHILE _SPACE (condition|andcondition|orcondition) _COLON _EOL (_SPACE command) (_EOL _SPACE command)* _EOL "end-block"
+//spaces are allowed before and after colon
+//TODO: this could be an attribute on the rule that we add in the merger
+_COLON: _SPACE* ":" _SPACE*
+
+elses: _EOL _SPACE* _ELSE _COLON _EOL (_SPACE command) (_EOL _SPACE command)* _EOL _END_BLOCK
+//TODO: after condition a space (or more) could also be ok? Python allows that
+ifs: _IF (condition|andcondition|orcondition) _COLON _EOL (_SPACE command) (_EOL _SPACE command)* _EOL _END_BLOCK//'if' cannot be used in Python, hence the name of the rule is 'ifs'
+// TODO: FH, jan 2022 (condition|andcondition|orcondition) could be made into a rule (also in use in level 13)
+elifs: _EOL _ELIF (condition|andcondition|orcondition) _COLON _EOL (_SPACE command) (_EOL _SPACE command)* _EOL _END_BLOCK
+
+for_list: _FOR var _IN var_access _COLON _EOL (_SPACE command) (_EOL _SPACE command)* _EOL _END_BLOCK
+for_loop: _FOR (NAME | var) _IN _RANGE (INT | var_access) _TO (INT | var_access) _COLON _EOL (_SPACE command) (_EOL _SPACE command)* _EOL _END_BLOCK
+while_loop: _WHILE (condition) _COLON _EOL (_SPACE command) (_EOL _SPACE command)* _EOL _END_BLOCK
+
